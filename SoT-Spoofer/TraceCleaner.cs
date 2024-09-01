@@ -1,5 +1,7 @@
 ﻿using Microsoft.Win32;
 using SoT_Spoofer.Wrappers;
+using System.Net;
+using System.Runtime.InteropServices;
 
 namespace SoT_Spoofer
 {
@@ -12,16 +14,12 @@ namespace SoT_Spoofer
             DeleteKey(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\XboxLive");
             DeleteKey(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Xbox");
 
-            DeleteCredential("Xbl|DeviceKey");
-            DeleteCredential("XblGrts|DeviceKey");
-            DeleteCredential("XboxLive");
-            DeleteCredential("Xbl_Ticket|1717113201|Production|860a62fd4fd198c4");
+            DeleteCredentialsStartingWith("Xbl");
+            DeleteCredentialsStartingWith("XboxLive");
 
             SpoofProfileGUID();
             SpoofMachineID();
             SpoofMachineGUID();
-
-            FlushDNS();
         }
 
         public static void DeleteKey(string path)
@@ -66,11 +64,6 @@ namespace SoT_Spoofer
             Registry.Users.DeleteSubKeyTree(subpath);
         }
 
-        private static void DeleteCredential(string Key)
-        {
-            NativeMethods.CredDelete(Key, NativeMethods.CRED_TYPE.GENERIC, 0);
-        }
-
         private static void SpoofProfileGUID()
         {
             RegistryKey registryKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64).OpenSubKey("SYSTEM\\CurrentControlSet\\Control\\IDConfigDB\\Hardware Profiles\\0001", true);
@@ -89,13 +82,41 @@ namespace SoT_Spoofer
             registryKey.SetValue("MachineGuid", Guid.NewGuid().ToString());
         }
 
-        private static void FlushDNS()
+        public static void DeleteCredentialsStartingWith(string prefix)
         {
-            Utils.RunAsProcess("ipconfig /release");
-            Utils.RunAsProcess("ipconfig /flushdns");
-            Utils.RunAsProcess("ipconfig /renew");
-            Utils.RunAsProcess("ipconfig /flushdns");
-            Utils.RunAsProcess("ping localhost -n 3 >nul");
+            IntPtr pCredentials = IntPtr.Zero;
+            int count = 0;
+
+            if (NativeMethods.CredEnumerate(null, 0, out count, out pCredentials))
+            {
+                try
+                {
+                    for (int i = 0; i < count; i++)
+                    {
+                        IntPtr credentialPtr = Marshal.ReadIntPtr(pCredentials, i * Marshal.SizeOf(typeof(IntPtr)));
+                        NativeMethods.CREDENTIAL credential = (NativeMethods.CREDENTIAL)Marshal.PtrToStructure(credentialPtr, typeof(NativeMethods.CREDENTIAL));
+
+                        if (credential.TargetName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            Logger.Log($"Deleting credential: {credential.TargetName}");
+
+                            bool success = NativeMethods.CredDelete(credential.TargetName, credential.Type, 0);
+                            if (!success)
+                            {
+                                Logger.LogError($"Failed to delete credential: {credential.TargetName}");
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    NativeMethods.CredFree(pCredentials);
+                }
+            }
+            else
+            {
+                Console.WriteLine("Failed to enumerate credentials.");
+            }
         }
     }
 }

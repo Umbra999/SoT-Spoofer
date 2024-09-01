@@ -8,7 +8,7 @@ namespace SoT_Spoofer
     {
         public static void Main()
         {
-            Console.Title = "SoT Spoofer | By Umbra";
+            Console.Title = "Advanced Sea of Thieves Cleaner";
 
             WindowsIdentity identity = WindowsIdentity.GetCurrent();
             WindowsPrincipal principal = new WindowsPrincipal(identity);
@@ -27,9 +27,7 @@ namespace SoT_Spoofer
                 return;
             }
 
-            Logger.LogWarning("This Tool is made to Spoof Data for SoT");
-            Logger.LogWarning("Spoofing is permanent, only use this tool if you really know what you are doing");
-            Logger.LogWarning("Press Enter to start spoofing");
+            Logger.LogWarning("Press Enter to start cleaning");
             Console.ReadLine();
 
             Logger.LogImportant("Blocking Analytics...");
